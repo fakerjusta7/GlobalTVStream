@@ -5,7 +5,7 @@ import Sidebar from "@/components/sidebar";
 import ChannelGrid from "@/components/channel-grid";
 import VideoPlayerModal from "@/components/video-player-modal";
 import { Channel } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Home() {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -14,6 +14,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Fetch channels based on filters
   const { data: channels = [], isLoading, error } = useQuery({
@@ -46,15 +47,27 @@ export default function Home() {
   // Sync channels on first load
   useEffect(() => {
     const syncChannels = async () => {
+      if (channels && channels.length > 0) {
+        return; // Don't sync if we already have channels
+      }
+      
+      setIsSyncing(true);
       try {
-        await apiRequest('POST', '/api/channels/sync');
+        const result = await apiRequest('POST', '/api/channels/sync');
+        console.log('Sync result:', result);
+        // Invalidate the cache to force a refresh
+        await queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/stats/countries'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/stats/categories'] });
       } catch (error) {
         console.error('Failed to sync channels:', error);
+      } finally {
+        setIsSyncing(false);
       }
     };
     
     syncChannels();
-  }, []);
+  }, [channels]);
 
   const handleChannelSelect = (channel: Channel) => {
     setSelectedChannel(channel);
@@ -176,7 +189,7 @@ export default function Home() {
 
             <ChannelGrid 
               channels={channels}
-              isLoading={isLoading}
+              isLoading={isLoading || isSyncing}
               onChannelSelect={handleChannelSelect}
             />
           </div>
