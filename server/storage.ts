@@ -70,7 +70,14 @@ export class MemStorage implements IStorage {
 
   async createChannel(insertChannel: InsertChannel): Promise<Channel> {
     const id = this.channelIdCounter++;
-    const channel: Channel = { ...insertChannel, id };
+    const channel: Channel = { 
+      ...insertChannel, 
+      id,
+      description: insertChannel.description || null,
+      language: insertChannel.language || null,
+      logo: insertChannel.logo || null,
+      isOnline: insertChannel.isOnline || null
+    };
     this.channels.set(id, channel);
     return channel;
   }
@@ -113,7 +120,7 @@ export class MemStorage implements IStorage {
   async getCountryStats(): Promise<Array<{code: string; name: string; channelCount: number}>> {
     const countryMap = new Map<string, {code: string; name: string; count: number}>();
     
-    for (const channel of this.channels.values()) {
+    for (const channel of Array.from(this.channels.values())) {
       const existing = countryMap.get(channel.countryCode);
       if (existing) {
         existing.count++;
@@ -134,7 +141,7 @@ export class MemStorage implements IStorage {
   async getCategoryStats(): Promise<Array<{name: string; count: number}>> {
     const categoryMap = new Map<string, number>();
     
-    for (const channel of this.channels.values()) {
+    for (const channel of Array.from(this.channels.values())) {
       const existing = categoryMap.get(channel.category);
       categoryMap.set(channel.category, (existing || 0) + 1);
     }
@@ -162,7 +169,11 @@ export class MemStorage implements IStorage {
 
   async addFavorite(insertFavorite: InsertFavorite): Promise<Favorite> {
     const id = this.favoriteIdCounter++;
-    const favorite: Favorite = { ...insertFavorite, id };
+    const favorite: Favorite = { 
+      id, 
+      userId: insertFavorite.userId || null,
+      channelId: insertFavorite.channelId || null
+    };
     this.favorites.set(id, favorite);
     return favorite;
   }

@@ -11,6 +11,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const channels = [];
     let currentChannel: any = {};
     
+    // Country code to country name mapping
+    const countryMap: { [key: string]: string } = {
+      'us': 'United States', 'uk': 'United Kingdom', 'ca': 'Canada', 'au': 'Australia',
+      'de': 'Germany', 'fr': 'France', 'es': 'Spain', 'it': 'Italy', 'nl': 'Netherlands',
+      'be': 'Belgium', 'ch': 'Switzerland', 'at': 'Austria', 'se': 'Sweden', 'no': 'Norway',
+      'dk': 'Denmark', 'fi': 'Finland', 'pl': 'Poland', 'cz': 'Czech Republic', 'sk': 'Slovakia',
+      'hu': 'Hungary', 'ro': 'Romania', 'bg': 'Bulgaria', 'hr': 'Croatia', 'si': 'Slovenia',
+      'rs': 'Serbia', 'ba': 'Bosnia and Herzegovina', 'me': 'Montenegro', 'mk': 'North Macedonia',
+      'al': 'Albania', 'gr': 'Greece', 'tr': 'Turkey', 'ru': 'Russia', 'ua': 'Ukraine',
+      'by': 'Belarus', 'lt': 'Lithuania', 'lv': 'Latvia', 'ee': 'Estonia', 'is': 'Iceland',
+      'ie': 'Ireland', 'pt': 'Portugal', 'mx': 'Mexico', 'br': 'Brazil', 'ar': 'Argentina',
+      'cl': 'Chile', 'co': 'Colombia', 'pe': 'Peru', 've': 'Venezuela', 'ec': 'Ecuador',
+      'uy': 'Uruguay', 'py': 'Paraguay', 'bo': 'Bolivia', 'jp': 'Japan', 'kr': 'South Korea',
+      'cn': 'China', 'tw': 'Taiwan', 'hk': 'Hong Kong', 'sg': 'Singapore', 'th': 'Thailand',
+      'my': 'Malaysia', 'id': 'Indonesia', 'ph': 'Philippines', 'vn': 'Vietnam', 'in': 'India',
+      'pk': 'Pakistan', 'bd': 'Bangladesh', 'lk': 'Sri Lanka', 'af': 'Afghanistan', 'ir': 'Iran',
+      'iq': 'Iraq', 'il': 'Israel', 'ps': 'Palestine', 'jo': 'Jordan', 'lb': 'Lebanon',
+      'sy': 'Syria', 'sa': 'Saudi Arabia', 'ae': 'United Arab Emirates', 'kw': 'Kuwait',
+      'qa': 'Qatar', 'bh': 'Bahrain', 'om': 'Oman', 'ye': 'Yemen', 'eg': 'Egypt',
+      'ly': 'Libya', 'tn': 'Tunisia', 'dz': 'Algeria', 'ma': 'Morocco', 'sd': 'Sudan',
+      'et': 'Ethiopia', 'ke': 'Kenya', 'tz': 'Tanzania', 'ug': 'Uganda', 'rw': 'Rwanda',
+      'za': 'South Africa', 'ng': 'Nigeria', 'gh': 'Ghana', 'ci': 'Côte d\'Ivoire',
+      'sn': 'Senegal', 'ml': 'Mali', 'bf': 'Burkina Faso', 'ne': 'Niger', 'td': 'Chad',
+      'cm': 'Cameroon', 'ga': 'Gabon', 'cg': 'Republic of the Congo', 'cd': 'Democratic Republic of the Congo',
+      'ao': 'Angola', 'zm': 'Zambia', 'zw': 'Zimbabwe', 'bw': 'Botswana', 'na': 'Namibia',
+      'sz': 'Eswatini', 'ls': 'Lesotho', 'mg': 'Madagascar', 'mu': 'Mauritius', 'sc': 'Seychelles'
+    };
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
@@ -25,20 +53,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const logoMatch = line.match(/tvg-logo="([^"]*)"/);
         const countryMatch = line.match(/tvg-country="([^"]*)"/);
         const categoryMatch = line.match(/group-title="([^"]*)"/);
+        const idMatch = line.match(/tvg-id="([^"]*)"/);
         
         if (logoMatch) currentChannel.logo = logoMatch[1];
-        if (countryMatch) {
-          const countries = countryMatch[1].split(';');
-          currentChannel.country = countries[0];
-          currentChannel.countryCode = countries[0].toLowerCase();
-        }
         if (categoryMatch) currentChannel.category = categoryMatch[1];
+        
+        // Enhanced country detection
+        let countryDetected = false;
+        
+        // First try tvg-country attribute
+        if (countryMatch) {
+          const countryValue = countryMatch[1].toLowerCase().trim();
+          if (countryMap[countryValue]) {
+            currentChannel.countryCode = countryValue;
+            currentChannel.country = countryMap[countryValue];
+            countryDetected = true;
+          }
+        }
+        
+        // If no country found, try to extract from tvg-id (e.g. "1TV.af@SD" -> "af")
+        if (!countryDetected && idMatch) {
+          const idValue = idMatch[1];
+          const countryCodeMatch = idValue.match(/\.([a-z]{2})(@|$)/);
+          if (countryCodeMatch) {
+            const countryCode = countryCodeMatch[1];
+            if (countryMap[countryCode]) {
+              currentChannel.countryCode = countryCode;
+              currentChannel.country = countryMap[countryCode];
+              countryDetected = true;
+            }
+          }
+        }
+        
+        // If still no country, try to extract from channel name
+        if (!countryDetected) {
+          const channelName = currentChannel.name?.toLowerCase() || '';
+          let foundCountry = null;
+          
+          // Check for country names or codes in channel name
+          for (const [code, name] of Object.entries(countryMap)) {
+            if (channelName.includes(name.toLowerCase()) || 
+                channelName.includes(code + ' ') || 
+                channelName.includes(' ' + code) ||
+                channelName.startsWith(code + ' ') ||
+                channelName.endsWith(' ' + code)) {
+              foundCountry = { code, name };
+              break;
+            }
+          }
+          
+          if (foundCountry) {
+            currentChannel.countryCode = foundCountry.code;
+            currentChannel.country = foundCountry.name;
+            countryDetected = true;
+          }
+        }
+        
+        // Default to Unknown if no country detected
+        if (!countryDetected) {
+          currentChannel.countryCode = 'xx';
+          currentChannel.country = 'Unknown';
+        }
         
       } else if (line.startsWith('http')) {
         // This is the stream URL
         currentChannel.streamUrl = line;
         currentChannel.isOnline = true;
         currentChannel.language = 'en';
+        currentChannel.description = null;
         
         // Set defaults if not found
         if (!currentChannel.category) currentChannel.category = 'General';
