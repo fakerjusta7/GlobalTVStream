@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font Awesome icons */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);
@@ -114,9 +117,6 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
-
-/* Font Awesome icons */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
 
 /* HLS.js integration */
 video {
